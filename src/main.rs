@@ -31,16 +31,20 @@ async fn main() {
             let mut line: String = String::new();
 
             loop {
-                let bytes_read: usize = reader.read_line(&mut line).await.unwrap();
-                if bytes_read == 0 {
-                    break;
+                tokio::select! {
+                    result = reader.read_line(&mut line) => {
+                        if result.unwrap() == 0 {
+                            break;
+                        }
+
+                        let _no_of_subscriptions: usize = tx.send(line.clone()).unwrap();
+                        line.clear();
+                    }
+                    result = rx.recv() => {
+                        let msg: String = result.unwrap();
+                        writer.write_all(msg.as_bytes()).await.unwrap();
+                    }
                 }
-
-                let _no_of_subscriptions: usize = tx.send(line.clone()).unwrap();
-                let msg: String = rx.recv().await.unwrap();
-
-                writer.write_all(msg.as_bytes()).await.unwrap();
-                line.clear();
             }
         });
     }
