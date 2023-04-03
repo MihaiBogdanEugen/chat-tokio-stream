@@ -7,6 +7,9 @@ use tokio::net::tcp::WriteHalf;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::io::AsyncBufReadExt;
+use tokio::sync::broadcast;
+use tokio::sync::broadcast::Receiver;
+use tokio::sync::broadcast::Sender;
 
 #[tokio::main]
 async fn main() {
@@ -14,8 +17,12 @@ async fn main() {
 
     let listener: TcpListener = TcpListener::bind("localhost:8484").await.unwrap();
 
+    let (tx, _rx): (Sender<String>, Receiver<String>) = broadcast::channel::<String>(10);
+
     loop {
         let (mut socket, _addr): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
+        let tx: Sender<String>  = tx.clone();
+        let mut rx: Receiver<String> = tx.subscribe();
 
         tokio::spawn(async move {
             let (reader, mut writer): (ReadHalf, WriteHalf) = socket.split();
@@ -29,7 +36,10 @@ async fn main() {
                     break;
                 }
 
-                writer.write_all(line.as_bytes()).await.unwrap();
+                let _no_of_subscriptions: usize = tx.send(line.clone()).unwrap();
+                let msg: String = rx.recv().await.unwrap();
+
+                writer.write_all(msg.as_bytes()).await.unwrap();
                 line.clear();
             }
         });
