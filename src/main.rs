@@ -13,19 +13,25 @@ async fn main() {
     println!("chat-tokio-stream");
 
     let listener: TcpListener = TcpListener::bind("localhost:8484").await.unwrap();
-    let (mut socket, _addr): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
-    let (reader, mut writer): (ReadHalf, WriteHalf) = socket.split();
-
-    let mut reader: BufReader<ReadHalf> = BufReader::new(reader);
-    let mut line = String::new();
 
     loop {
-        let bytes_read: usize = reader.read_line(&mut line).await.unwrap();
-        if bytes_read == 0 {
-            break;
-        }
+        let (mut socket, _addr): (TcpStream, SocketAddr) = listener.accept().await.unwrap();
 
-        writer.write_all(line.as_bytes()).await.unwrap();
-        line.clear();
+        tokio::spawn(async move {
+            let (reader, mut writer): (ReadHalf, WriteHalf) = socket.split();
+
+            let mut reader: BufReader<ReadHalf> = BufReader::new(reader);
+            let mut line: String = String::new();
+
+            loop {
+                let bytes_read: usize = reader.read_line(&mut line).await.unwrap();
+                if bytes_read == 0 {
+                    break;
+                }
+
+                writer.write_all(line.as_bytes()).await.unwrap();
+                line.clear();
+            }
+        });
     }
 }
